@@ -1,0 +1,92 @@
+(ns donut.email
+  (:require
+   [clojure.java.io :as io]
+   [selmer.parser :as selmer]))
+
+(def EmailSchema
+  [:re {:description   "https://github.com/gfredericks/test.chuck/issues/46"
+        :gen/fmap      '(constantly "random@example.com")
+        :error/message "Please enter an email address"}
+   #"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,63}$"])
+
+(def OptsInputSchema
+  [:map
+   [:to {:optional? true} EmailSchema]
+   [:from {:optional? true} EmailSchema]
+   [:data {:optional? true} :map]
+   [:subject {:optional? true} :string]
+   [:subject-template {:optional? true} :string]
+   [:headers {:optional? true} :string]
+   [:html {:optional? true} :string]
+   [:text {:optional? true} :string]])
+
+(def OptsOutputSchema
+  [:map
+   [:to EmailSchema]
+   [:from EmailSchema]
+   [:subject :string]
+   [:headers :string]
+   [:html :string]
+   [:text :string]])
+
+(defn- template-path
+  [template-name template-format template-dir]
+  (str template-dir "/" (name template-name) "." (name template-format)))
+
+(defn render-body-template
+  [template-name
+   template-format
+   render-fn
+   {:keys [html-template text-template data template-dir]}]
+  {:pre [template-name template-format]}
+  (cond
+    (and (= :html template-format) html-template)
+    (render-fn html-template data)
+
+    (and (= :text template-format) text-template)
+    (render-fn text-template data)
+
+    :else
+    (when-let [template (io/resource (template-path template-name
+                                                    (if (= :text template-format) :txt :html)
+                                                    template-dir))]
+      (render-fn (slurp template) data))))
+
+(defn render-subject
+  [render-fn {:keys [subject-template data]}]
+  {:pre [subject-template]}
+  (render-fn subject-template data))
+
+(defmulti email-opts
+  (fn [template-name _opts] template-name))
+
+(defmethod email-opts :default
+  [_ opts]
+  opts)
+
+(defn add-default-opts
+  [template-name render-fn {:keys [subject html text] :as opts}]
+  {:post [(or (:html %) (:text %)) (or (:subject %) (:subject-template %))]}
+  (merge opts
+         {:subject (or subject (render-subject render-fn opts))
+          :html    (or html (render-body-template template-name :html render-fn opts))
+          :text    (or text (render-body-template template-name :text render-fn opts))}))
+
+(defn construct-email-opts
+  [template-name render-fn opts common-opts]
+  (add-default-opts template-name
+                    render-fn
+                    (merge common-opts
+                           (email-opts template-name opts))))
+
+(defn combined-send-email-fn
+  [send-fn render-fn common-opts]
+  (fn combined-send-email [template-name opts]
+    (send-fn (construct-email-opts template-name render-fn opts common-opts))))
+
+(def EmailComponent
+  #:donut.system{:start  (fn [{{:keys [send-fn render-fn common-opts]} :donut.system/config}]
+                           (combined-send-email-fn send-fn render-fn common-opts))
+                 :config {:send-fn     identity
+                          :render-fn   selmer/render
+                          :common-opts {:template-dir "donut/email-templates"}}})
