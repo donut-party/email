@@ -25,7 +25,7 @@
    [:to EmailSchema]
    [:from EmailSchema]
    [:subject :string]
-   [:headers :string]
+   [:headers {:optional? true} :string]
    [:html :string]
    [:text :string]])
 

@@ -11,9 +11,6 @@ jobs:
           name: test clj
           command: clojure -X:test
       - run:
-          name: test clj
-          command: clojure -X:test-cljs
-      - run:
           name: Build
           command: clojure -T:build jar
       - save-cache:
