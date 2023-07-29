@@ -1,7 +1,9 @@
 (ns donut.email
   (:require
    [clojure.java.io :as io]
-   [selmer.parser :as selmer]))
+   [selmer.parser :as selmer]
+   [malli.core :as m]
+   [malli.error :as me]))
 
 (def EmailSchema
   [:re {:description   "https://github.com/gfredericks/test.chuck/issues/46"
@@ -11,21 +13,22 @@
 
 (def OptsInputSchema
   [:map
-   [:to {:optional? true} EmailSchema]
-   [:from {:optional? true} EmailSchema]
-   [:data {:optional? true} :map]
-   [:subject {:optional? true} :string]
-   [:subject-template {:optional? true} :string]
-   [:headers {:optional? true} :string]
-   [:html {:optional? true} :string]
-   [:text {:optional? true} :string]])
+   [:to {:optional true} EmailSchema]
+   [:from {:optional true} EmailSchema]
+   [:data {:optional true} :map]
+   [:subject {:optional true} :string]
+   [:subject-template {:optional true} :string]
+   [:headers {:optional true} :string]
+   [:html {:optional true} :string]
+   [:text {:optional true} :string]
+   [:template-name {:optional true} :string]])
 
 (def OptsOutputSchema
   [:map
    [:to EmailSchema]
    [:from EmailSchema]
    [:subject :string]
-   [:headers {:optional? true} :string]
+   [:headers {:optional true} :string]
    [:html :string]
    [:text :string]])
 
@@ -54,39 +57,42 @@
 
 (defn render-subject
   [render-fn {:keys [subject-template data]}]
-  {:pre [subject-template]}
   (render-fn subject-template data))
 
-(defmulti email-opts
+(defmulti build-opts
   (fn [template-name _opts] template-name))
 
-(defmethod email-opts :default
+(defmethod build-opts :default
   [_ opts]
   opts)
 
-(defn add-default-opts
+(defn- add-default-opts
   [template-name render-fn {:keys [subject html text] :as opts}]
-  {:post [(or (:html %) (:text %)) (or (:subject %) (:subject-template %))]}
   (merge opts
          {:subject (or subject (render-subject render-fn opts))
           :html    (or html (render-body-template template-name :html render-fn opts))
           :text    (or text (render-body-template template-name :text render-fn opts))}))
 
-(defn construct-email-opts
+(defn build-send-opts
   [template-name render-fn opts common-opts]
-  (add-default-opts template-name
-                    render-fn
-                    (merge common-opts
-                           (email-opts template-name opts))))
+  (let [email-opts (add-default-opts template-name
+                                     render-fn
+                                     (merge common-opts
+                                            (build-opts template-name opts)))]
+    (when-let [explanation (m/explain OptsOutputSchema email-opts)]
+      (throw (ex-info "Could not build valid email opts"
+                      {:spec-explain-human (me/humanize explanation)
+                       :spec-explain       explanation})))
+    email-opts))
 
-(defn combined-send-email-fn
+(defn build-email-and-send-fn
   [send-fn render-fn common-opts]
-  (fn combined-send-email [template-name opts]
-    (send-fn (construct-email-opts template-name render-fn opts common-opts))))
+  (fn build-email-and-send [template-name opts]
+    (send-fn (build-send-opts template-name render-fn opts common-opts))))
 
 (def EmailComponent
   #:donut.system{:start  (fn [{{:keys [send-fn render-fn common-opts]} :donut.system/config}]
-                           (combined-send-email-fn send-fn render-fn common-opts))
+                           (build-email-and-send-fn send-fn render-fn common-opts))
                  :config {:send-fn     identity
                           :render-fn   selmer/render
                           :common-opts {:template-dir "donut/email-templates"}}})

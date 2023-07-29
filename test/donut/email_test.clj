@@ -4,7 +4,7 @@
    [donut.email :as de]
    [selmer.parser :as selmer]))
 
-(def test-send-email (de/combined-send-email-fn identity selmer/render {:template-dir "donut/email-templates"}))
+(def test-send-email (de/build-email-and-send-fn identity selmer/render {:template-dir "donut/email-templates"}))
 
 (deftest renders-subject
   (is (= "hi buddy"
