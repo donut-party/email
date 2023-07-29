@@ -163,4 +163,3 @@ attempts to render by looking up `:template-dir/:template-name.txt` and
 
 `:template-dir`, `:template-name`, and `:data` should be included in
 `build-opts`.
-
