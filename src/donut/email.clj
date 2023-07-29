@@ -74,10 +74,10 @@
           :text    (or text (render-body-template template-name :text render-fn opts))}))
 
 (defn build-send-opts
-  [template-name render-fn opts common-opts]
+  [template-name render-fn opts default-build-opts]
   (let [email-opts (add-default-opts template-name
                                      render-fn
-                                     (merge common-opts
+                                     (merge default-build-opts
                                             (build-opts template-name opts)))]
     (when-let [explanation (m/explain OptsOutputSchema email-opts)]
       (throw (ex-info "Could not build valid email opts"
@@ -86,13 +86,13 @@
     email-opts))
 
 (defn build-email-and-send-fn
-  [send-fn render-fn common-opts]
+  [send-fn render-fn default-build-opts]
   (fn build-email-and-send [template-name opts]
-    (send-fn (build-send-opts template-name render-fn opts common-opts))))
+    (send-fn (build-send-opts template-name render-fn opts default-build-opts))))
 
 (def EmailComponent
-  #:donut.system{:start  (fn [{{:keys [send-fn render-fn common-opts]} :donut.system/config}]
-                           (build-email-and-send-fn send-fn render-fn common-opts))
-                 :config {:send-fn     identity
-                          :render-fn   selmer/render
-                          :common-opts {:template-dir "donut/email-templates"}}})
+  #:donut.system{:start  (fn [{{:keys [send-fn render-fn default-build-opts]} :donut.system/config}]
+                           (build-email-and-send-fn send-fn render-fn default-build-opts))
+                 :config {:send-fn            identity
+                          :render-fn          selmer/render
+                          :default-build-opts {:template-dir "donut/email-templates"}}})
