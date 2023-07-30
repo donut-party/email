@@ -2,7 +2,7 @@
 
 # donut.email
 
-This library defines an API for constructing emails independent of whatever
+This library provides a helper for constructing emails independent of whatever
 email service you use. Features include:
 
 * Use email text and HTML email templates for email body
