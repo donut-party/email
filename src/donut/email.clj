@@ -25,24 +25,25 @@
    [:template-name {:optional true} [:or :keyword :string]]])
 
 (def OptsOutputSchema
-  [:map
-   [:to EmailSchema]
-   [:from EmailSchema]
-   [:subject :string]
-   [:headers {:optional true} :string]
-   [:html :string]
-   [:text :string]])
+  [:and
+   [:map
+    [:to EmailSchema]
+    [:from EmailSchema]
+    [:subject :string]
+    [:headers {:optional true} :string]]
+   [:or
+    [:map
+     [:html :string]]
+    [:map
+     [:text :string]]]])
 
 (defn- template-path
   [template-name template-format template-dir]
   (str template-dir "/" (name template-name) "." (name template-format)))
 
-(defn render-body-template
-  [template-name
-   template-format
-   render
-   {:keys [html-template text-template data template-dir]}]
-  {:pre [template-name template-format]}
+(defn- render-body-template
+  [template-format {:keys [html-template text-template data template-dir template-name render]}]
+  {:pre [template-format]}
   (cond
     (and (= :html template-format) html-template)
     (render html-template data)
@@ -51,14 +52,16 @@
     (render text-template data)
 
     :else
-    (when-let [template (io/resource (template-path template-name
-                                                    (if (= :text template-format) :txt :html)
-                                                    template-dir))]
+    (when-let [template (and template-name
+                             (io/resource (template-path template-name
+                                                         (if (= :text template-format) :txt :html)
+                                                         template-dir)))]
       (render (slurp template) data))))
 
 (defn render-subject
-  [render {:keys [subject-template data]}]
-  (render subject-template data))
+  [{:keys [subject-template data render]}]
+  (when subject-template
+    (render subject-template data)))
 
 (defmulti template-build-opts (fn [{:keys [template-name]}] template-name))
 
@@ -67,18 +70,27 @@
   opts)
 
 (defn- render-opts
-  [{:keys [render template-name subject html text] :as opts}]
+  [{:keys [render subject html text] :as opts}]
   (if render
     (merge opts
-           {:subject (or subject (render-subject render opts))
-            :html    (or html (render-body-template template-name :html render opts))
-            :text    (or text (render-body-template template-name :text render opts))})
+           {:subject (or subject (render-subject opts))
+            :html    (or html (render-body-template :html opts))
+            :text    (or text (render-body-template :text opts))})
     opts))
 
-(defn build-send-opts
+(defn- merge-email-opts
+  [m1 m2]
+  (cond-> m1
+    (or (:subject m1) (:subject-template m1)) (dissoc :subject :subject-template)
+    (or (:text m1) (:text-template m1)) (dissoc :text :text-template)
+    (or (:html m1) (:html-template m1)) (dissoc :html :html-template)
+    true (merge m2)))
+
+(defn- build-send-opts
   [opts default-build-opts]
   (let [email-opts (-> default-build-opts
-                       (merge (template-build-opts opts))
+                       (merge-email-opts (template-build-opts opts))
+                       (merge-email-opts opts)
                        render-opts)]
     (when-let [explanation (m/explain OptsOutputSchema email-opts)]
       (throw (ex-info "Could not build valid email opts"

@@ -45,6 +45,21 @@
                                   :data {:username "buddy"}})
           [:text :html]))))
 
+(deftest option-precedence
+  (let [precedence-email-send (de/build-email-and-send-fn
+                               identity
+                               {:render selmer/render
+                                :template-dir "donut/email-templates"
+                                :subject "this gets overridden"})]
+    (is (= "higher precedence subject"
+           (:subject
+            (precedence-email-send {:to "test@test.com"
+                                    :from "test@test.com"
+                                    :subject-template "higher precedence {{noun}}"
+                                    :text "test"
+                                    :html "test"
+                                    :data {:noun "subject"}}))))))
+
 (def system
   #::ds{:defs
         {:services

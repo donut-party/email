@@ -85,14 +85,16 @@ donut.email library understands the following build options:
 |---------------------|-------------------------------------------------------------------------------|
 | `:to`               | "to" email address                                                            |
 | `:from`             | "from" email address                                                          |
+| `:render`           | function that takes a template string and `:data` to render subject and body  |
+| `:data`             | map used to render templates                                                  |
 | `:subject`          | email subject                                                                 |
 | `:subject-template` | a string that can be used to interpolate values, like `"hi, {{ username! }}"` |
 | `:headers`          | email headers                                                                 |
 | `:html`             | html part of the body. optional. `:text` used if `:html` not included         |
+| `:html-template`    | renders value for `:html` using `:render` and `:data`                         |
 | `:text`             | text-only part of the body                                                    |
+| `:text-template`    | renders value for `:text` using `:render` and `:data`                         |
 | `:template-name`    | keyword that's used to a) look up build options and b) read body templates    |
-| `:data`             | map used to render templates                                                  |
-| `:render`           | function that takes a template string and `:data` to render subject and body  |
 
 These options are used to construct _send options_ according to the rules below.
 You can also include other keys in the build options map. These will get passed
@@ -149,13 +151,16 @@ These options get merged with the default options (defined when when you call
 
 If you provide a `:subject` key, that is used as a subject. Otherwise
 `:subject-template` is used to generate a value for the `:subject` key using the
-`:data` map
+`:render` function and the `:data` map
 
 ### Constructing `:text` and `:html`
 
-If you provide `:text` and `:html` keys, those are used. Otherwise donut.email
-attempts to render by looking up `:template-dir/:template-name.txt` and
-`:template-dir/:template-name.txt`. The render function is called like this:
+1. If you provide `:text` and `:html` keys, those are used.
+2. Otherwise if you provide `:text-template` and `:html-template` keys, those
+   are used to render the values for `:text` and `:html`
+3. Otherwise donut.email attempts to render by looking up
+  `:template-dir/:template-name.txt` and `:template-dir/:template-name.txt`. The
+  render function is called like this:
 
 ```
 (render (slurp (io/resource template-location)) data)
