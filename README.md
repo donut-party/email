@@ -55,7 +55,7 @@ Example usage:
              :subject-template "welcome {username}!"
              :data {:username username}})
 
-;; This will look up "email-templates/welcome.html"
+;; Pass in template name, :welcome. This will look up "email-templates/welcome.html"
 ;; and "email-templates/welcome.txt" to produce the value for the `:text` and
 ;; `:html` keys
 (send-email :welcome
