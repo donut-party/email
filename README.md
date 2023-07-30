@@ -5,7 +5,7 @@
 This library provides a helper for constructing emails independent of whatever
 email service you use. Features include:
 
-* Use email text and HTML email templates for email body
+* Use text and HTML email templates for email body
 * Use text template for email subject
 * Set global options (like `:from`) and easily override those options
 * Parameterizes the email sending function so you can replace it with a mock in
