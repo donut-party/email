@@ -1,6 +1,7 @@
 (ns donut.email
   (:require
    [clojure.java.io :as io]
+   [donut.sugar.utils :as u]
    [selmer.parser :as selmer]
    [malli.core :as m]
    [malli.error :as me]))
@@ -21,7 +22,7 @@
    [:headers {:optional true} :string]
    [:html {:optional true} :string]
    [:text {:optional true} :string]
-   [:template-name {:optional true} :string]])
+   [:template-name {:optional true} [:or :keyword :string]]])
 
 (def OptsOutputSchema
   [:map
@@ -39,46 +40,46 @@
 (defn render-body-template
   [template-name
    template-format
-   render-fn
+   render
    {:keys [html-template text-template data template-dir]}]
   {:pre [template-name template-format]}
   (cond
     (and (= :html template-format) html-template)
-    (render-fn html-template data)
+    (render html-template data)
 
     (and (= :text template-format) text-template)
-    (render-fn text-template data)
+    (render text-template data)
 
     :else
     (when-let [template (io/resource (template-path template-name
                                                     (if (= :text template-format) :txt :html)
                                                     template-dir))]
-      (render-fn (slurp template) data))))
+      (render (slurp template) data))))
 
 (defn render-subject
-  [render-fn {:keys [subject-template data]}]
-  (render-fn subject-template data))
+  [render {:keys [subject-template data]}]
+  (render subject-template data))
 
-(defmulti build-opts
-  (fn [template-name _opts] template-name))
+(defmulti template-build-opts (fn [{:keys [template-name]}] template-name))
 
-(defmethod build-opts :default
-  [_ opts]
+(defmethod template-build-opts :default
+  [opts]
   opts)
 
-(defn- add-default-opts
-  [template-name render-fn {:keys [subject html text] :as opts}]
-  (merge opts
-         {:subject (or subject (render-subject render-fn opts))
-          :html    (or html (render-body-template template-name :html render-fn opts))
-          :text    (or text (render-body-template template-name :text render-fn opts))}))
+(defn- render-opts
+  [{:keys [render template-name subject html text] :as opts}]
+  (if render
+    (merge opts
+           {:subject (or subject (render-subject render opts))
+            :html    (or html (render-body-template template-name :html render opts))
+            :text    (or text (render-body-template template-name :text render opts))})
+    opts))
 
 (defn build-send-opts
-  [template-name render-fn opts default-build-opts]
-  (let [email-opts (add-default-opts template-name
-                                     render-fn
-                                     (merge default-build-opts
-                                            (build-opts template-name opts)))]
+  [opts default-build-opts]
+  (let [email-opts (-> default-build-opts
+                       (merge (template-build-opts opts))
+                       render-opts)]
     (when-let [explanation (m/explain OptsOutputSchema email-opts)]
       (throw (ex-info "Could not build valid email opts"
                       {:spec-explain-human (me/humanize explanation)
@@ -86,13 +87,21 @@
     email-opts))
 
 (defn build-email-and-send-fn
-  [send-fn render-fn default-build-opts]
-  (fn build-email-and-send [template-name opts]
-    (send-fn (build-send-opts template-name render-fn opts default-build-opts))))
+  [send default-build-opts]
+  (fn build-email-and-send
+    ([opts]
+     (build-email-and-send nil opts))
+    ([template-name opts]
+     (send (build-send-opts (assoc opts :template-name template-name)
+                            default-build-opts)))))
 
 (def EmailComponent
-  #:donut.system{:start  (fn [{{:keys [send-fn render-fn default-build-opts]} :donut.system/config}]
-                           (build-email-and-send-fn send-fn render-fn default-build-opts))
-                 :config {:send-fn            identity
-                          :render-fn          selmer/render
-                          :default-build-opts {:template-dir "donut/email-templates"}}})
+  #:donut.system{:start  (fn [{{:keys [send default-build-opts]} :donut.system/config}]
+                           (build-email-and-send-fn send default-build-opts))
+                 :config {:send identity
+                          :default-build-opts {:render selmer/render
+                                               :template-dir "donut/email-templates"}}})
+
+(defn email-component
+  [config]
+  (update EmailComponent :donut.system/config u/deep-merge config))

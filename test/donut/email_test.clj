@@ -2,9 +2,14 @@
   (:require
    [clojure.test :refer [deftest is]]
    [donut.email :as de]
+   [donut.system :as ds]
    [selmer.parser :as selmer]))
 
-(def test-send-email (de/build-email-and-send-fn identity selmer/render {:template-dir "donut/email-templates"}))
+(def test-send-email
+  (de/build-email-and-send-fn
+   identity
+   {:render    selmer/render
+    :template-dir "donut/email-templates"}))
 
 (deftest renders-subject
   (is (= "hi buddy"
@@ -39,3 +44,41 @@
                                   :subject "hi"
                                   :data {:username "buddy"}})
           [:text :html]))))
+
+(def system
+  #::ds{:defs
+        {:services
+         {:email (de/email-component {:default-build-opts {:from "hi@example.com"}})}}})
+
+(defmethod de/template-build-opts ::donut-system-component
+  [opts]
+  (assoc opts :template-build-opts-works? true))
+
+(deftest donut-system-component
+  (let [email (ds/instance (ds/start system) [:services :email])]
+    (is (= {:render selmer/render
+            :template-name nil
+            :template-dir "donut/email-templates"
+            :from "hi@example.com"
+            :to "user@place.com"
+            :subject "test"
+            :text "hi"
+            :html "hi"}
+           (email {:to "user@place.com"
+                   :subject "test"
+                   :text "hi"
+                   :html "hi"})))
+
+    (is (= {:render selmer/render
+            :template-name ::donut-system-component
+            :template-dir "donut/email-templates"
+            :template-build-opts-works? true
+            :from "hi@example.com"
+            :to "user@place.com"
+            :subject "test"
+            :text "hi"
+            :html "hi"}
+           (email ::donut-system-component {:to "user@place.com"
+                                            :subject "test"
+                                            :text "hi"
+                                            :html "hi"})))))
