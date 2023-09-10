@@ -4,7 +4,8 @@
    [donut.sugar.utils :as u]
    [selmer.parser :as selmer]
    [malli.core :as m]
-   [malli.error :as me]))
+   [malli.error :as me]
+   [clojure.string :as str]))
 
 (def EmailSchema
   [:re {:description   "https://github.com/gfredericks/test.chuck/issues/46"
@@ -39,7 +40,15 @@
 
 (defn- template-path
   [template-name template-format template-dir]
-  (str template-dir "/" (name template-name) "." (name template-format)))
+  (str template-dir
+       (some-> (namespace template-name)
+               (str/replace #"-" "_")
+               (str/replace "." java.io.File/separator)
+               (#(str "/" %)))
+       "/"
+       (name template-name)
+       "."
+       (name template-format)))
 
 (defn- render-body-template
   [template-format {:keys [html-template text-template data template-dir template-name render]}]
