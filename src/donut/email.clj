@@ -1,13 +1,12 @@
 (ns donut.email
   (:require
    [clojure.java.io :as io]
-   [donut.sugar.utils :as u]
-   [selmer.parser :as selmer]
+   [clojure.string :as str]
    [malli.core :as m]
    [malli.error :as me]
-   [clojure.string :as str]))
+   [selmer.parser :as selmer]))
 
-(def EmailSchema
+(def EmailAddressSchema
   [:re {:description   "https://github.com/gfredericks/test.chuck/issues/46"
         :gen/fmap      '(constantly "random@example.com")
         :error/message "Please enter an email address"}
@@ -15,8 +14,8 @@
 
 (def OptsInputSchema
   [:map
-   [:to {:optional true} EmailSchema]
-   [:from {:optional true} EmailSchema]
+   [:to {:optional true} EmailAddressSchema]
+   [:from {:optional true} EmailAddressSchema]
    [:data {:optional true} :map]
    [:subject {:optional true} :string]
    [:subject-template {:optional true} :string]
@@ -28,8 +27,8 @@
 (def OptsOutputSchema
   [:and
    [:map
-    [:to EmailSchema]
-    [:from EmailSchema]
+    [:to EmailAddressSchema]
+    [:from EmailAddressSchema]
     [:subject :string]
     [:headers {:optional true} :string]]
    [:or
@@ -116,13 +115,9 @@
      (send (build-send-opts (assoc opts :template-name template-name)
                             default-build-opts)))))
 
-(def EmailComponent
+(def SendEmailComponent
   #:donut.system{:start  (fn [{{:keys [send default-build-opts]} :donut.system/config}]
                            (build-email-and-send-fn send default-build-opts))
                  :config {:send identity
                           :default-build-opts {:render selmer/render
                                                :template-dir "donut/email-templates"}}})
-
-(defn email-component
-  [config]
-  (update EmailComponent :donut.system/config u/deep-merge config))
