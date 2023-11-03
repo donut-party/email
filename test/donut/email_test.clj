@@ -63,14 +63,14 @@
 (def system
   #::ds{:defs
         {:services
-         {:email (de/email-component {:default-build-opts {:from "hi@example.com"}})}}})
+         {:send-email (ds/configure-component de/SendEmailComponent {[:default-build-opts :from] "hi@example.com"})}}})
 
 (defmethod de/template-build-opts ::donut-system-component
   [opts]
   (assoc opts :template-build-opts-works? true))
 
 (deftest donut-system-component
-  (let [email (ds/instance (ds/start system) [:services :email])]
+  (let [send-email (ds/instance (ds/start system) [:services :send-email])]
     (is (= {:render selmer/render
             :template-name nil
             :template-dir "donut/email-templates"
@@ -79,10 +79,10 @@
             :subject "test"
             :text "hi"
             :html "hi"}
-           (email {:to "user@place.com"
-                   :subject "test"
-                   :text "hi"
-                   :html "hi"})))
+           (send-email {:to "user@place.com"
+                        :subject "test"
+                        :text "hi"
+                        :html "hi"})))
 
     (is (= {:render selmer/render
             :template-name ::donut-system-component
@@ -93,7 +93,7 @@
             :subject "test"
             :text "hi"
             :html "hi"}
-           (email ::donut-system-component {:to "user@place.com"
-                                            :subject "test"
-                                            :text "hi"
-                                            :html "hi"})))))
+           (send-email ::donut-system-component {:to "user@place.com"
+                                                 :subject "test"
+                                                 :text "hi"
+                                                 :html "hi"})))))

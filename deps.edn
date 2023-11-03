@@ -10,7 +10,7 @@
 
   :test
   {:extra-paths ["test" "resources"]
-   :extra-deps  {party.donut/system {:mvn/version "0.0.208"}
+   :extra-deps  {party.donut/system {:mvn/version "0.0.218"}
                  io.github.cognitect-labs/test-runner
                  {:git/tag "v0.5.0" :git/sha "48c3c67"}}
    :exec-fn     cognitect.test-runner.api/test}

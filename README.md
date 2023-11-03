@@ -171,13 +171,13 @@ If you provide a `:subject` key, that is used as a subject. Otherwise
 
 ## donut.system component
 
-`donut.email/EmailComponent` defines a component that you can use with
+`donut.email/SendEmailComponent` defines a component that you can use with
 [donut.system](https://github.com/donut-party/system). You configure the sending
 function it produces by updating the `:donut.system/config` key. Here's the
 component's definition:
 
 ``` clojure
-(def EmailComponent
+(def SendEmailComponent
   #:donut.system{:start  (fn [{{:keys [send default-build-opts]} :donut.system/config}]
                            (build-email-and-send-fn send default-build-opts))
                  :config {:send identity
@@ -185,13 +185,17 @@ component's definition:
                                                :template-dir "donut/email-templates"}}})
 ```
 
-The helper function `donut.email/email-component` takes one argument, a map, and
+The helper function `donut.system/configure-component` makes it the tiniest bit
+more convenient to set configuration options:
+
+takes one argument, a map, and
 will deep-merge that map into the default `:donut.system/config` for
-`donut.email/EmailComponent`:
+`donut.email/SendEmailComponent`:
 
 ``` clojure
-(donut.email/email-component
-  {:default-build-opts {:from "info@yourdomain.com"}})
+(donut.system/configure-component
+  donut.email/SendEmailComponent
+  {[:default-build-opts :from] "info@yourdomain.com"})
 ;; =>
 
 #:donut.system{:start  (fn [{{:keys [send render-fn default-build-opts]} :donut.system/config}]
